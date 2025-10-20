@@ -72,24 +72,24 @@ Ovaj model je jednostavan, ali dovoljno kompleksan da se vidi korist od P2P uče
 ```mermaid
 flowchart TD
 
-    subgraph PeerA["Čvor A"]
-        A1[Treniraj lokalni model (MLP)] --> A2[Pošalji model susjedima (gRPC)]
-        A2 --> A3[Primi modele susjeda]
-        A3 --> A4[Prosjek parametara (konsenzus)]
+    subgraph PeerA["Node A"]
+        A1[Train local model (MLP)] --> A2[Send model to peers (gRPC)]
+        A2 --> A3[Receive models from peers]
+        A3 --> A4[Average parameters (consensus)]
         A4 --> A1
     end
 
-    subgraph PeerB["Čvor B"]
-        B1[Treniraj lokalni model (MLP)] --> B2[Pošalji model susjedima (gRPC)]
-        B2 --> B3[Primi modele susjeda]
-        B3 --> B4[Prosjek parametara (konsenzus)]
+    subgraph PeerB["Node B"]
+        B1[Train local model (MLP)] --> B2[Send model to peers (gRPC)]
+        B2 --> B3[Receive models from peers]
+        B3 --> B4[Average parameters (consensus)]
         B4 --> B1
     end
 
-    subgraph PeerC["Čvor C"]
-        C1[Treniraj lokalni model (MLP)] --> C2[Pošalji model susjedima (gRPC)]
-        C2 --> C3[Primi modele susjeda]
-        C3 --> C4[Prosjek parametara (konsenzus)]
+    subgraph PeerC["Node C"]
+        C1[Train local model (MLP)] --> C2[Send model to peers (gRPC)]
+        C2 --> C3[Receive models from peers]
+        C3 --> C4[Average parameters (consensus)]
         C4 --> C1
     end
 
