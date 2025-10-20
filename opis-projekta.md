@@ -71,32 +71,28 @@ Ovaj model je jednostavan, ali dovoljno kompleksan da se vidi korist od P2P uče
 
 ```mermaid
 flowchart TD
-
     subgraph PeerA["Node A"]
-        A1[Train local model (MLP)] --> A2[Send model to peers (gRPC)]
-        A2 --> A3[Receive models from peers]
-        A3 --> A4[Average parameters (consensus)]
+        A1["Train local model - MLP"] --> A2["Send model to peers (gRPC)"]
+        A2 --> A3["Receive models from peers"]
+        A3 --> A4["Average parameters (consensus)"]
         A4 --> A1
     end
 
     subgraph PeerB["Node B"]
-        B1[Train local model (MLP)] --> B2[Send model to peers (gRPC)]
-        B2 --> B3[Receive models from peers]
-        B3 --> B4[Average parameters (consensus)]
+        B1["Train local model - MLP"] --> B2["Send model to peers (gRPC)"]
+        B2 --> B3["Receive models from peers"]
+        B3 --> B4["Average parameters (consensus)"]
         B4 --> B1
     end
 
     subgraph PeerC["Node C"]
-        C1[Train local model (MLP)] --> C2[Send model to peers (gRPC)]
-        C2 --> C3[Receive models from peers]
-        C3 --> C4[Average parameters (consensus)]
+        C1["Train local model - MLP"] --> C2["Send model to peers (gRPC)"]
+        C2 --> C3["Receive models from peers"]
+        C3 --> C4["Average parameters (consensus)"]
         C4 --> C1
     end
 
     PeerA <--> PeerB
     PeerB <--> PeerC
     PeerC <--> PeerA
-
-    classDef peer fill:#1e3a8a,stroke:#1e3a8a,stroke-width:1px,color:white;
-    class PeerA,PeerB,PeerC peer;
 ```
