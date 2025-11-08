@@ -42,6 +42,7 @@ func setupMDNS(ctx context.Context, h host.Host) error {
 	return nil
 }
 
+// transfer models between nodes
 func handleModelProtocol(h host.Host, modelRoot string) {
 	h.SetStreamHandler(modelProtocolID, func(s network.Stream) {
 		defer s.Close()
@@ -80,6 +81,7 @@ func handleModelProtocol(h host.Host, modelRoot string) {
 	})
 }
 
+// announcement of new models to pubsub
 func announceModels(ctx context.Context, topic *pubsub.Topic, h host.Host, modelRoot string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -121,6 +123,7 @@ func announceModels(ctx context.Context, topic *pubsub.Topic, h host.Host, model
 	}
 }
 
+// subscribe to topic of model announcements
 func subscribeAnnouncements(ctx context.Context, topic *pubsub.Topic, h host.Host, modelRoot string) {
 	sub, err := topic.Subscribe()
 	if err != nil {
