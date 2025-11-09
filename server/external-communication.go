@@ -25,58 +25,66 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-func (n *mdnsNotifee) HandlePeerFound(pi peer.AddrInfo) {
+func (notifee *mdnsNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	log.Printf("[mDNS] discovered: %s\n", pi.ID)
 	// add to peerstore so we can dial directly
-	n.h.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
+	notifee.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
 }
 
-func setupMDNS(ctx context.Context, h host.Host) error {
-	// mdns.NewMdnsService(ctx, h, rendezvous, notifee)
-	s := mdns.NewMdnsService(h, mdnsServiceTag, &mdnsNotifee{h: h})
-	// the mdns pkg runs its own goroutine
+func setupMDNS(ctx context.Context, host host.Host) error {
+	mdnsService := mdns.NewMdnsService(host, mdnsServiceTag, &mdnsNotifee{host: host})
+
+	// the mdns pkg runs its own goroutine - cleanup goroutine for it
 	go func() {
 		<-ctx.Done()
-		s.Close()
+		mdnsService.Close()
 	}()
+
 	return nil
 }
 
 // transfer models between nodes
-func handleModelProtocol(h host.Host, modelRoot string) {
-	h.SetStreamHandler(modelProtocolID, func(s network.Stream) {
-		defer s.Close()
-		remote := s.Conn().RemotePeer()
+func handleModelProtocol(host host.Host, modelRoot string) {
+	host.SetStreamHandler(modelProtocolID, func(stream network.Stream) {
+		defer stream.Close()
+
+		remote := stream.Conn().RemotePeer()
 		log.Printf("[protocol] incoming stream from %s\n", remote)
-		r := bufio.NewReader(s)
-		reqLine, err := r.ReadString('\n')
+
+		reader := bufio.NewReader(stream)
+
+		reqLine, err := reader.ReadString('\n')
 		if err != nil {
 			log.Printf("failed reading request: %v\n", err)
 			return
 		}
+
 		reqLine = strings.TrimSpace(reqLine)
 		// request format: "GET <modelID>\n"
 		parts := strings.SplitN(reqLine, " ", 2)
 		if len(parts) != 2 || strings.ToUpper(parts[0]) != "GET" {
-			io.WriteString(s, "ERR invalid request\n")
+			io.WriteString(stream, "ERR invalid request\n")
 			return
 		}
+
 		modelID := parts[1]
 		path := filepath.Join(modelRoot, modelID)
-		f, err := os.Open(path)
+		file, err := os.Open(path)
 		if err != nil {
-			io.WriteString(s, fmt.Sprintf("ERR open: %v\n", err))
+			io.WriteString(stream, fmt.Sprintf("ERR open: %v\n", err))
 			log.Printf("could not open model %s: %v\n", path, err)
 			return
 		}
-		defer f.Close()
-		io.WriteString(s, "OK\n") // handshake
+		defer file.Close()
+
+		io.WriteString(stream, "OK\n") // handshake
 		// stream file bytes
-		n, err := io.Copy(s, f)
+		n, err := io.Copy(stream, file)
 		if err != nil {
 			log.Printf("error sending model: %v\n", err)
 			return
 		}
+
 		log.Printf("sent %d bytes of model %s to %s\n", n, modelID, remote)
 	})
 }
@@ -89,16 +97,17 @@ func announceModels(ctx context.Context, topic *pubsub.Topic, h host.Host, model
 	pid := h.ID()
 
 	for {
-		// gather models from modelRoot
 		files, err := os.ReadDir(modelRoot)
 		if err != nil {
 			log.Printf("announce: could not read model dir: %v\n", err)
 			return
 		}
+
 		for _, fi := range files {
 			if fi.IsDir() {
 				continue
 			}
+
 			stat, _ := fi.Info()
 			meta := ModelMeta{
 				PeerID:   pid.String(),
@@ -140,16 +149,19 @@ func subscribeAnnouncements(ctx context.Context, topic *pubsub.Topic, h host.Hos
 				log.Printf("error reading pubsub message: %v\n", err)
 				continue
 			}
+
 			// ignore self published messages
 			if msg.ReceivedFrom == h.ID() {
 				continue
 			}
+
 			var m ModelMeta
 			if err := json.Unmarshal(msg.Data, &m); err != nil {
 				log.Printf("invalid meta from %s: %v\n", msg.ReceivedFrom, err)
 				continue
 			}
 			log.Printf("[pubsub] discovered model announcement: peer=%s model=%s size=%d\n", m.PeerID, m.ModelID, m.Size)
+
 			// try to fetch it (simple: fetch immediately once)
 			go func(meta ModelMeta) {
 				peerID, err := peer.Decode(meta.PeerID)
@@ -160,9 +172,11 @@ func subscribeAnnouncements(ctx context.Context, topic *pubsub.Topic, h host.Hos
 				// ensure we have addresses for the peer. If not, try to dial (mDNS likely supplied addr)
 				ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 				defer cancel()
+
 				if err := h.Connect(ctx2, peer.AddrInfo{ID: peerID}); err != nil {
 					log.Printf("connect failed to %s: %v\n", meta.PeerID, err)
 				}
+
 				// open stream
 				stream, err := h.NewStream(ctx2, peerID, modelProtocolID)
 				if err != nil {
@@ -176,12 +190,14 @@ func subscribeAnnouncements(ctx context.Context, topic *pubsub.Topic, h host.Hos
 					log.Printf("write request err: %v\n", err)
 					return
 				}
+
 				br := bufio.NewReader(stream)
 				line, err := br.ReadString('\n')
 				if err != nil {
 					log.Printf("failed read handshake: %v\n", err)
 					return
 				}
+
 				if strings.HasPrefix(line, "OK") {
 					outpath := filepath.Join(modelRoot, "remote_"+meta.ModelID)
 					out, err := os.Create(outpath)
@@ -216,16 +232,21 @@ func main() {
 	ctx := context.Background()
 
 	var (
-		listen      = flag.String("listen", "/ip4/0.0.0.0/tcp/0", "multiaddr to listen on")
-		modelDir    = flag.String("models", "./models", "directory containing model files to serve (one file per modelID)")
+		listen = flag.String("listen", "/ip4/0.0.0.0/tcp/0", "multiaddr to listen on")
+		localModelDir = flag.String("local", "../local-models", "directory containing local model files (one file per modelID)")
+		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")
 		announceInt = flag.Duration("announce", 15*time.Second, "how often to announce available models on pubsub")
-		nick        = flag.String("nick", "", "optional human-readable nickname")
+		nick = flag.String("nick", "", "optional human-readable nickname")
 	)
 	flag.Parse()
 
-	// ensure model dir exists
-	if err := os.MkdirAll(*modelDir, 0755); err != nil {
-		log.Fatalf("could not create model dir: %v", err)
+	// ensure model dirs exists
+	if err := os.MkdirAll(*localModelDir, 0755); err != nil {
+		log.Fatalf("could not create local model dir: %v", err)
+	}
+
+	if err := os.MkdirAll(*remoteModelDir, 0755); err != nil {
+		log.Fatalf("could not create remote model dir: %v", err)
 	}
 
 	// create libp2p host
@@ -234,26 +255,26 @@ func main() {
 		log.Fatalf("invalid listen multiaddr: %v", err)
 	}
 
-	h, err := libp2p.New(
+	host, err := libp2p.New(
 		libp2p.ListenAddrs(addr),
 	)
 	if err != nil {
 		log.Fatalf("failed to create libp2p host: %v", err)
 	}
-	defer h.Close()
+	defer host.Close()
 
-	printAddrs(h)
+	printAddrs(host)
 	if *nick != "" {
 		fmt.Printf("nick: %s\n", *nick)
 	}
 
 	// setup mDNS discovery for LAN
-	if err := setupMDNS(ctx, h); err != nil {
+	if err := setupMDNS(ctx, host); err != nil {
 		log.Printf("warning: mdns setup failed: %v", err)
 	}
 
 	// setup pubsub
-	ps, err := pubsub.NewGossipSub(ctx, h)
+	ps, err := pubsub.NewGossipSub(ctx, host)
 	if err != nil {
 		log.Fatalf("pubsub init failed: %v", err)
 	}
@@ -264,13 +285,13 @@ func main() {
 	}
 
 	// start protocol handler for model transfers
-	handleModelProtocol(h, *modelDir)
+	handleModelProtocol(host, *localModelDir)
 
 	// subscribe to announcements
-	subscribeAnnouncements(ctx, topic, h, *modelDir)
+	subscribeAnnouncements(ctx, topic, host, *remoteModelDir)
 
 	// start announcer to periodically publish local model metadata
-	go announceModels(ctx, topic, h, *modelDir, *announceInt)
+	go announceModels(ctx, topic, host, *localModelDir, *announceInt)
 
 	// wait for a SIGINT or SIGTERM signal
 	ch := make(chan os.Signal, 1)

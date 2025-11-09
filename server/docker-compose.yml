@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+    node1:
+        build: .
+        container_name: node1
+        environment:
+            - NICK=node1
+        command:
+            [
+                "-listen",
+                "/ip4/0.0.0.0/tcp/9001",
+                "-local",
+                "/models",
+                "-remote",
+                "/models/remote-models",
+                "-nick",
+                "${NICK}",
+            ]
+
+    node2:
+        build: .
+        container_name: node2
+        environment:
+            - NICK=node2
+        command:
+            [
+                "-listen",
+                "/ip4/0.0.0.0/tcp/9002",
+                "-local",
+                "/models",
+                "-remote",
+                "/models/remote-models",
+                "-nick",
+                "${NICK}",
+            ]
+
+    node3:
+        build: .
+        container_name: node3
+        environment:
+            - NICK=node3
+        command:
+            [
+                "-listen",
+                "/ip4/0.0.0.0/tcp/9003",
+                "-local",
+                "/models",
+                "-remote",
+                "/models/remote-models",
+                "-nick",
+                "${NICK}",
+            ]
+
+networks:
+    flnet:
+        driver: bridge

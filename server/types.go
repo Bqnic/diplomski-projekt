@@ -20,5 +20,5 @@ type ModelMeta struct {
 
 // mdnsNotifee implements mdns.Notifee to be informed about newly discovered peers.
 type mdnsNotifee struct {
-	h host.Host
+	host host.Host
 }
