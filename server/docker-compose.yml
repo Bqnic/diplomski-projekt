@@ -1,62 +1,18 @@
 version: "3.9"
 
 services:
-    node1:
+    node:
         build: .
-        container_name: node1
-        network_mode: "host"
-        environment:
-            - NICK=node1
-        command:
-            [
-                "-listen",
-                "/ip4/0.0.0.0/tcp/9001",
-                "-local",
-                "/models",
-                "-remote",
-                "/models/remote-models",
-                "-nick",
-                "${NICK}",
-            ]
+        command: >
+            /app/main
+            -listen /ip4/0.0.0.0/tcp/${LISTEN_PORT:-9000}
+            -local /models
+            -remote /models/remote-models
+            -nick ${NICK:-node}
+            ${EXTRA_ARGS:-}
         volumes:
-            - ./models/node1:/models
-
-    node2:
-        build: .
-        container_name: node2
-        network_mode: "host"
+            - ./models/${NICK:-node}:/models
         environment:
-            - NICK=node2
-        command:
-            [
-                "-listen",
-                "/ip4/0.0.0.0/tcp/9002",
-                "-local",
-                "/models",
-                "-remote",
-                "/models/remote-models",
-                "-nick",
-                "${NICK}",
-            ]
-        volumes:
-            - ./models/node2:/models
-
-    node3:
-        build: .
-        container_name: node3
-        network_mode: "host"
-        environment:
-            - NICK=node3
-        command:
-            [
-                "-listen",
-                "/ip4/0.0.0.0/tcp/9003",
-                "-local",
-                "/models",
-                "-remote",
-                "/models/remote-models",
-                "-nick",
-                "${NICK}",
-            ]
-        volumes:
-            - ./models/node3:/models
+            - NICK=${NICK:-node}
+            - LISTEN_PORT=${LISTEN_PORT:-9000}
+            - EXTRA_ARGS=${EXTRA_ARGS:-}

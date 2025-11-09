@@ -1,6 +1,8 @@
 package main
 
-import "github.com/libp2p/go-libp2p/core/host"
+import (
+	"github.com/libp2p/go-libp2p/core/host"
+) 
 
 const (
 	// Rendezvous topic for mDNS and pubsub topic name for model announcements

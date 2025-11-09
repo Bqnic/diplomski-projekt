@@ -16,32 +16,80 @@ import (
 	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	peerstore "github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	discUtil "github.com/libp2p/go-libp2p/p2p/discovery/util"
+	"github.com/multiformats/go-multiaddr"
 )
 
-func (notifee *mdnsNotifee) HandlePeerFound(pi peer.AddrInfo) {
-	log.Printf("[mDNS] discovered: %s\n", pi.ID)
-	// add to peerstore so we can dial directly
-	notifee.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
+func NewKDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*routing.RoutingDiscovery, error) {
+	var options []dht.Option
+
+	if len(bootstrapPeers) == 0 {
+		options = append(options, dht.Mode(dht.ModeServer))
+	}
+
+	kdht, err := dht.New(ctx, host, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = kdht.Bootstrap(ctx); err != nil {
+		return nil, err
+	}
+	
+	for _, peerAddr := range bootstrapPeers {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+
+		go func(peerinfo peer.AddrInfo) {
+			if err := host.Connect(ctx, peerinfo); err != nil {
+				log.Printf("Error connecting to %v: %v", peerinfo, err)
+			} else {
+				log.Printf("Connected to bootstrap node: %v", peerinfo)
+			}
+		}(*peerinfo)
+	}
+
+	return routing.NewRoutingDiscovery(kdht), nil
 }
 
-func setupMDNS(ctx context.Context, host host.Host) error {
-	mdnsService := mdns.NewMdnsService(host, mdnsServiceTag, &mdnsNotifee{host: host})
+func Discover(ctx context.Context, h host.Host, dht *routing.RoutingDiscovery, rendezvous string) {
+	var routingDiscovery = routing.NewRoutingDiscovery(dht)
+	discUtil.Advertise(ctx, routingDiscovery, rendezvous)
 
-	// the mdns pkg runs its own goroutine - cleanup goroutine for it
-	go func() {
-		<-ctx.Done()
-		mdnsService.Close()
-	}()
+	ticker := time.NewTicker(time.Second * 1)
+	defer ticker.Stop()
 
-	return nil
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+
+			peers, err := discUtil.FindPeers(ctx, routingDiscovery, rendezvous)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			for _, p := range peers {
+				if p.ID == h.ID() {
+					continue
+				}
+				if h.Network().Connectedness(p.ID) != network.Connected {
+					_, err = h.Network().DialPeer(ctx, p.ID)
+					if err != nil {
+						continue
+					}
+				}
+			}
+		}
+	}
 }
+
 
 // transfer models between nodes
 func handleModelProtocol(host host.Host, modelRoot string) {
@@ -230,14 +278,17 @@ func printAddrs(h host.Host) {
 
 func main() {
 	ctx := context.Background()
+	var discoveryPeers addrList
 
 	var (
+		rendezvous = flag.String("rendezvous", "diabetes", "")
 		listen = flag.String("listen", "/ip4/0.0.0.0/tcp/0", "multiaddr to listen on")
 		localModelDir = flag.String("local", "../local-models", "directory containing local model files (one file per modelID)")
 		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")
 		announceInt = flag.Duration("announce", 15*time.Second, "how often to announce available models on pubsub")
-		nick = flag.String("nick", "", "optional human-readable nickname")
+		nick = flag.String("nick", "", "optional human-readable nickname")	
 	)
+	flag.Var(&discoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.Parse()
 
 	// ensure model dirs exists
@@ -250,7 +301,7 @@ func main() {
 	}
 
 	// create libp2p host
-	addr, err := ma.NewMultiaddr(*listen)
+	addr, err := multiaddr.NewMultiaddr(*listen)
 	if err != nil {
 		log.Fatalf("invalid listen multiaddr: %v", err)
 	}
@@ -268,11 +319,6 @@ func main() {
 		fmt.Printf("nick: %s\n", *nick)
 	}
 
-	// setup mDNS discovery for LAN
-	if err := setupMDNS(ctx, host); err != nil {
-		log.Printf("warning: mdns setup failed: %v", err)
-	}
-
 	// setup pubsub
 	ps, err := pubsub.NewGossipSub(ctx, host)
 	if err != nil {
@@ -283,6 +329,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to join pubsub topic: %v", err)
 	}
+
+	dht, err := NewKDHT(ctx, host, discoveryPeers)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go Discover(ctx, host, dht, *rendezvous)
+
 
 	// start protocol handler for model transfers
 	handleModelProtocol(host, *localModelDir)
@@ -299,3 +353,23 @@ func main() {
 	<-ch
 	fmt.Println("Received signal, shutting down...")
 }
+
+type addrList []multiaddr.Multiaddr
+
+func (al *addrList) String() string {
+	strs := make([]string, len(*al))
+	for i, addr := range *al {
+		strs[i] = addr.String()
+	}
+	return strings.Join(strs, ",")
+}
+
+func (al *addrList) Set(value string) error {
+	addr, err := multiaddr.NewMultiaddr(value)
+	if err != nil {
+		return err
+	}
+	*al = append(*al, addr)
+	return nil
+}
+
