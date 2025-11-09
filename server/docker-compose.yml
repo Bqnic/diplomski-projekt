@@ -4,6 +4,7 @@ services:
     node1:
         build: .
         container_name: node1
+        network_mode: "host"
         environment:
             - NICK=node1
         command:
@@ -17,10 +18,13 @@ services:
                 "-nick",
                 "${NICK}",
             ]
+        volumes:
+            - ./models/node1:/models
 
     node2:
         build: .
         container_name: node2
+        network_mode: "host"
         environment:
             - NICK=node2
         command:
@@ -34,10 +38,13 @@ services:
                 "-nick",
                 "${NICK}",
             ]
+        volumes:
+            - ./models/node2:/models
 
     node3:
         build: .
         container_name: node3
+        network_mode: "host"
         environment:
             - NICK=node3
         command:
@@ -51,7 +58,5 @@ services:
                 "-nick",
                 "${NICK}",
             ]
-
-networks:
-    flnet:
-        driver: bridge
+        volumes:
+            - ./models/node3:/models
