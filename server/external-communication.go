@@ -44,6 +44,7 @@ func NewKDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mul
 	
 	for _, peerAddr := range bootstrapPeers {
 		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		log.Printf("peer %s", peerinfo.String())
 
 		go func(peerinfo peer.AddrInfo) {
 			if err := host.Connect(ctx, peerinfo); err != nil {
@@ -57,38 +58,35 @@ func NewKDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mul
 	return routing.NewRoutingDiscovery(kdht), nil
 }
 
-func Discover(ctx context.Context, h host.Host, dht *routing.RoutingDiscovery, rendezvous string) {
-	var routingDiscovery = routing.NewRoutingDiscovery(dht)
-	discUtil.Advertise(ctx, routingDiscovery, rendezvous)
+func Discover(ctx context.Context, h host.Host, rd *routing.RoutingDiscovery, rendezvous string) {
+    discUtil.Advertise(ctx, rd, rendezvous)
 
-	ticker := time.NewTicker(time.Second * 1)
-	defer ticker.Stop()
+    ticker := time.NewTicker(time.Second * 1)
+    defer ticker.Stop()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-
-			peers, err := discUtil.FindPeers(ctx, routingDiscovery, rendezvous)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			for _, p := range peers {
-				if p.ID == h.ID() {
-					continue
-				}
-				if h.Network().Connectedness(p.ID) != network.Connected {
-					_, err = h.Network().DialPeer(ctx, p.ID)
-					if err != nil {
-						continue
-					}
-				}
-			}
-		}
-	}
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            peers, err := discUtil.FindPeers(ctx, rd, rendezvous)
+            if err != nil {
+                log.Printf("FindPeers err: %v", err)
+                continue
+            }
+            for _, p := range peers {
+                if p.ID == h.ID() {
+                    continue
+                }
+                if h.Network().Connectedness(p.ID) != network.Connected {
+                    log.Printf("Discovered peer via DHT: %s", p.ID)
+                    h.Connect(ctx, p)
+                }
+            }
+        }
+    }
 }
+
 
 
 // transfer models between nodes
@@ -282,7 +280,7 @@ func main() {
 
 	var (
 		rendezvous = flag.String("rendezvous", "diabetes", "")
-		listen = flag.String("listen", "/ip4/0.0.0.0/tcp/0", "multiaddr to listen on")
+		listen = flag.String("listen", "", "multiaddr to listen on")
 		localModelDir = flag.String("local", "../local-models", "directory containing local model files (one file per modelID)")
 		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")
 		announceInt = flag.Duration("announce", 15*time.Second, "how often to announce available models on pubsub")
@@ -336,7 +334,6 @@ func main() {
 	}
 
 	go Discover(ctx, host, dht, *rendezvous)
-
 
 	// start protocol handler for model transfers
 	handleModelProtocol(host, *localModelDir)
