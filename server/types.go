@@ -1,12 +1,7 @@
 package main
 
-import (
-	"github.com/libp2p/go-libp2p/core/host"
-) 
-
 const (
 	// Rendezvous topic for mDNS and pubsub topic name for model announcements
-	mdnsServiceTag   = "fl-mdns-demo"
 	pubsubTopicName  = "fl-model-announcements"
 	modelProtocolID  = "/fl/model/1.0.0" // custom stream protocol to request model bytes
 )
@@ -18,9 +13,4 @@ type ModelMeta struct {
 	Size     int64  `json:"size"`
 	Filename string `json:"filename"`
 	Time     int64  `json:"time_unix"`
-}
-
-// mdnsNotifee implements mdns.Notifee to be informed about newly discovered peers.
-type mdnsNotifee struct {
-	host host.Host
 }

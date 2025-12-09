@@ -284,7 +284,6 @@ func main() {
 		localModelDir = flag.String("local", "../local-models", "directory containing local model files (one file per modelID)")
 		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")
 		announceInt = flag.Duration("announce", 15*time.Second, "how often to announce available models on pubsub")
-		nick = flag.String("nick", "", "optional human-readable nickname")	
 	)
 	flag.Var(&discoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.Parse()
@@ -313,9 +312,6 @@ func main() {
 	defer host.Close()
 
 	printAddrs(host)
-	if *nick != "" {
-		fmt.Printf("nick: %s\n", *nick)
-	}
 
 	// setup pubsub
 	ps, err := pubsub.NewGossipSub(ctx, host)
@@ -327,6 +323,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to join pubsub topic: %v", err)
 	}
+
 
 	dht, err := NewKDHT(ctx, host, discoveryPeers)
 	if err != nil {

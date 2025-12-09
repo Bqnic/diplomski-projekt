@@ -11,5 +11,4 @@ Running docker:
  -listen "/ip4/0.0.0.0/tcp/9002" \
  -local /models \
  -remote /models/remote-models \
- -nick node2 \
  -peer /ip4/172.17.0.2/tcp/9001/p2p/12D3KooWQep4BBcvaYwzHLyVTBofUwHrSsJuQatwfx6BLiaezSqd`
