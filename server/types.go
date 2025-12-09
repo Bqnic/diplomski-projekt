@@ -1,5 +1,7 @@
 package main
 
+import "github.com/multiformats/go-multiaddr"
+
 const (
 	// Rendezvous topic for mDNS and pubsub topic name for model announcements
 	pubsubTopicName  = "fl-model-announcements"
@@ -14,3 +16,5 @@ type ModelMeta struct {
 	Filename string `json:"filename"`
 	Time     int64  `json:"time_unix"`
 }
+
+type addrList []multiaddr.Multiaddr
