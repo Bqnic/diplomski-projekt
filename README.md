@@ -1,14 +1,26 @@
-# How to run
+# Kako pokrenit
 
-Building docker image:
+Docker image:
 `docker build -t server-node .`
 
-Running docker:
-`docker run --rm -it \
- -v "/models/node1/:/models" \
+Prvi čvor postaje bootstrapped čvor, pokreće se docker bez peer dijela.
+Bootstrap čvor je onaj čvor preko kojeg će svi ostali čvorovi otkriti mrežu.
+
+```docker run --rm -it \
+ -p 9001:9001 \
+ server-node \
+ -listen "/ip4/0.0.0.0/tcp/9001" \
+ -local /shared/local-models \
+ -remote /shared/remote-models```
+
+Svi ostali čvorovi se pokreću s peer dijelom, a postavlja se adresa bootstrap čvora (prvog pokrenutog)
+
+```docker run --rm -it \
  -p 9002:9002 \
  server-node \
  -listen "/ip4/0.0.0.0/tcp/9002" \
- -local /models \
- -remote /models/remote-models \
- -peer /ip4/172.17.0.2/tcp/9001/p2p/12D3KooWQep4BBcvaYwzHLyVTBofUwHrSsJuQatwfx6BLiaezSqd`
+ -local /shared/local-models \
+ -remote /shared/remote-models \
+ -peer /ip4/172.17.0.2/tcp/9001/p2p/12D3KooWQep4BBcvaYwzHLyVTBofUwHrSsJuQatwfx6BLiaezSqd```
+ 
+Pri pokretanju pripaziti da se port promijeni, mora bit unikatan za svaki čvor.
