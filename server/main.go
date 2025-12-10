@@ -26,26 +26,24 @@ func main() {
 	ctx := context.Background()
 	var discoveryPeers common.AddrList
 
-	var (
-		rendezvous = flag.String("rendezvous", "diabetes", "")
-		listen = flag.String("listen", "", "multiaddr to listen on")
-		localModelDir = flag.String("local", "../local-models", "directory containing local model files (one file per modelID)")
-		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")		
-	)
+	listen := os.Getenv("FL_LISTEN")
+	localModelDir := os.Getenv("FL_LOCAL")
+	remoteModelDir := os.Getenv("FL_REMOTE")
+
 	flag.Var(&discoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.Parse()
 
 	// ensure model dirs exists
-	if err := os.MkdirAll(*localModelDir, 0755); err != nil {
+	if err := os.MkdirAll(localModelDir, 0755); err != nil {
 		log.Fatalf("could not create local model dir: %v", err)
 	}
 
-	if err := os.MkdirAll(*remoteModelDir, 0755); err != nil {
+	if err := os.MkdirAll(remoteModelDir, 0755); err != nil {
 		log.Fatalf("could not create remote model dir: %v", err)
 	}
 
 	// create libp2p host
-	addr, err := multiaddr.NewMultiaddr(*listen)
+	addr, err := multiaddr.NewMultiaddr(listen)
 	if err != nil {
 		log.Fatalf("invalid listen multiaddr: %v", err)
 	}
@@ -92,16 +90,16 @@ func main() {
     grpcServer.Serve(lis)
 	// --grpc--
 
-	go discovery.Discover(ctx, host, dht, *rendezvous)
+	go discovery.Discover(ctx, host, dht, "diabetes")
 
 	// start protocol handler for model transfers
-	communication.HandleModelProtocol(host, *localModelDir)
+	communication.HandleModelProtocol(host, localModelDir)
 
 	// subscribe to announcements
-	localPubSub.SubscribeAnnouncements(ctx, topic, host, *remoteModelDir)
+	localPubSub.SubscribeAnnouncements(ctx, topic, host, remoteModelDir)
 
 	// start announcer to periodically publish local model metadata
-	go localPubSub.AnnounceModel(ctx, topic, host, *localModelDir)
+	go localPubSub.AnnounceModel(ctx, topic, host, localModelDir)
 
 	// wait for a SIGINT or SIGTERM signal
 	ch := make(chan os.Signal, 1)
