@@ -1,4 +1,4 @@
-package main
+package communication
 
 import (
 	"bufio"
@@ -12,13 +12,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bqnic/diplomski-projekt/common"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
-func handleModelProtocol(host host.Host, modelRoot string) {
+var modelProtocolID protocol.ID = "/fl/model/1.0.0"
+
+func HandleModelProtocol(host host.Host, modelRoot string) {
 	host.SetStreamHandler(modelProtocolID, func(stream network.Stream) {
 		defer stream.Close()
 
@@ -63,7 +67,7 @@ func handleModelProtocol(host host.Host, modelRoot string) {
 	})
 }
 
-func getRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, modelRoot string) {
+func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, modelRoot string) {
 	for {
 			msg, err := sub.Next(ctx)
 			if err != nil {
@@ -79,7 +83,7 @@ func getRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 				continue
 			}
 
-			var m ModelMeta
+			var m common.ModelMeta
 			if err := json.Unmarshal(msg.Data, &m); err != nil {
 				log.Printf("invalid meta from %s: %v\n", msg.ReceivedFrom, err)
 				continue
@@ -87,7 +91,7 @@ func getRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 			log.Printf("[pubsub] discovered model announcement: peer=%s model=%s size=%d\n", m.PeerID, m.ModelID, m.Size)
 
 			// try to fetch it (simple: fetch immediately once)
-			go func(meta ModelMeta) {
+			go func(meta common.ModelMeta) {
 				peerID, err := peer.Decode(meta.PeerID)
 				if err != nil {
 					log.Printf("invalid peer id: %v\n", err)

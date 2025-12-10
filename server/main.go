@@ -8,8 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/bqnic/diplomski-projekt/common"
+	"github.com/bqnic/diplomski-projekt/communication"
+	"github.com/bqnic/diplomski-projekt/discovery"
+	localPubSub "github.com/bqnic/diplomski-projekt/pubsub"
 	libp2p "github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
@@ -17,14 +20,13 @@ import (
 
 func main() {
 	ctx := context.Background()
-	var discoveryPeers addrList
+	var discoveryPeers common.AddrList
 
 	var (
 		rendezvous = flag.String("rendezvous", "diabetes", "")
 		listen = flag.String("listen", "", "multiaddr to listen on")
 		localModelDir = flag.String("local", "../local-models", "directory containing local model files (one file per modelID)")
-		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")
-		announceInt = flag.Duration("announce", 15*time.Second, "how often to announce available models on pubsub")
+		remoteModelDir = flag.String("remote", "../remote-models", "directory containing remote model files (one file per modelID)")		
 	)
 	flag.Var(&discoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.Parse()
@@ -52,7 +54,7 @@ func main() {
 	}
 	defer host.Close()
 
-	printAddrs(host)
+	common.PrintAddrs(host)
 
 	// setup pubsub
 	ps, err := pubsub.NewGossipSub(ctx, host)
@@ -60,27 +62,27 @@ func main() {
 		log.Fatalf("pubsub init failed: %v", err)
 	}
 
-	topic, err := ps.Join(pubsubTopicName)
+	topic, err := ps.Join(common.PubsubTopicName)
 	if err != nil {
 		log.Fatalf("failed to join pubsub topic: %v", err)
 	}
 
 
-	dht, err := NewKDHT(ctx, host, discoveryPeers)
+	dht, err := discovery.NewKDHT(ctx, host, discoveryPeers)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go Discover(ctx, host, dht, *rendezvous)
+	go discovery.Discover(ctx, host, dht, *rendezvous)
 
 	// start protocol handler for model transfers
-	handleModelProtocol(host, *localModelDir)
+	communication.HandleModelProtocol(host, *localModelDir)
 
 	// subscribe to announcements
-	subscribeAnnouncements(ctx, topic, host, *remoteModelDir)
+	localPubSub.SubscribeAnnouncements(ctx, topic, host, *remoteModelDir)
 
 	// start announcer to periodically publish local model metadata
-	go announceModels(ctx, topic, host, *localModelDir, *announceInt)
+	//go localPubSub.AnnounceModel(ctx, topic, host, *localModelDir)
 
 	// wait for a SIGINT or SIGTERM signal
 	ch := make(chan os.Signal, 1)

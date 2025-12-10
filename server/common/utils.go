@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-func printAddrs(h host.Host) {
+func PrintAddrs(h host.Host) {
 	fmt.Println("Host ID:", h.ID())
 	fmt.Println("Listening on:")
 	for _, a := range h.Addrs() {
@@ -16,7 +16,7 @@ func printAddrs(h host.Host) {
 	}
 }
 
-func (al *addrList) String() string {
+func (al *AddrList) String() string {
 	strs := make([]string, len(*al))
 	for i, addr := range *al {
 		strs[i] = addr.String()
@@ -24,7 +24,7 @@ func (al *addrList) String() string {
 	return strings.Join(strs, ",")
 }
 
-func (al *addrList) Set(value string) error {
+func (al *AddrList) Set(value string) error {
 	addr, err := multiaddr.NewMultiaddr(value)
 	if err != nil {
 		return err
