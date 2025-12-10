@@ -8,34 +8,37 @@ import (
 	"time"
 
 	"github.com/bqnic/diplomski-projekt/common"
-	"github.com/fsnotify/fsnotify"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+
+	"github.com/radovskyb/watcher"
 )
 
 func AnnounceModel(ctx context.Context, topic *pubsub.Topic, h host.Host, modelRoot string) error {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	defer w.Close()
+	w := watcher.New()
 
-	if err := w.Add(modelRoot); err != nil {
+	// Polling interval (100ms is fast but safe)
+	w.SetMaxEvents(1)
+	w.FilterOps(watcher.Create, watcher.Write, watcher.Rename, watcher.Move)
+
+	// Recursive watch
+	if err := w.AddRecursive(modelRoot); err != nil {
 		return err
 	}
 
 	peerID := h.ID().String()
 	ann := NewAnnouncer()
 
+	// Debounce map: path → timer
 	pending := make(map[string]*time.Timer)
 
 	stabilize := func(path string) {
-		timer, exists := pending[path]
-		if exists {
-			timer.Stop()
+		if t, ok := pending[path]; ok {
+			t.Stop()
 		}
-		timer = time.AfterFunc(500*time.Millisecond, func() {
-			// Check hash and announce
+
+		pending[path] = time.AfterFunc(500*time.Millisecond, func() {
+			// Hash and announce
 			hash, size, err := hashFile(path)
 			if err != nil {
 				return
@@ -63,29 +66,35 @@ func AnnounceModel(ctx context.Context, topic *pubsub.Topic, h host.Host, modelR
 			ann.add(hash)
 			log.Printf("[pubsub] announced model %s (%d bytes)", meta.Filename, meta.Size)
 		})
-
-		pending[path] = timer
 	}
 
+	// Start watcher loop
 	go func() {
 		defer log.Println("model watcher stopped")
 
 		for {
 			select {
-			case ev := <-w.Events:
-				if ev.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Rename) != 0 {
-					path := ev.Name
-					stabilize(path)
-				}
+			case ev := <-w.Event:
+				path := ev.Path
+				stabilize(path)
 
-			case err := <-w.Errors:
-				log.Printf("watcher error: %v\n", err)
+			case err := <-w.Error:
+				log.Printf("watcher error: %v", err)
 
 			case <-ctx.Done():
+				w.Close()
 				return
 			}
 		}
 	}()
 
+	// Start polling
+	go func() {
+		if err := w.Start(100 * time.Millisecond); err != nil {
+			log.Printf("watcher failed: %v", err)
+		}
+	}()
+
+	log.Printf("watching directory recursively: %s", modelRoot)
 	return nil
 }
