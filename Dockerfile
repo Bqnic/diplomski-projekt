@@ -40,4 +40,4 @@ RUN mkdir -p /app/shared/local-models && \
 # Add supervisor config
 COPY init/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-ENTRYPOINT ["/usr/bin/supervisord"]
+ENTRYPOINT ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
