@@ -31,7 +31,7 @@ Pri pokretanju pripaziti da se port promijeni, mora bit unikatan za svaki čvor.
 
 ### Proto compiler (pokrenit iz root-a)
 
-**Ne treba se opet pokrećati, file-ovi su već generirani, samo pokrenit ako je .proto file promijenjen!.**
+**Ne treba se opet pokrećati, file-ovi su već generirani, samo pokrenit ako je .proto file promijenjen!**
 
 Go:
 
