@@ -14,7 +14,6 @@ import (
 
 	"github.com/bqnic/diplomski-projekt/common"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -22,8 +21,8 @@ import (
 
 var modelProtocolID protocol.ID = "/fl/model/1.0.0"
 
-func HandleModelProtocol(host host.Host, modelRoot string) {
-	host.SetStreamHandler(modelProtocolID, func(stream network.Stream) {
+func HandleModelProtocol() {
+	common.Host.SetStreamHandler(modelProtocolID, func(stream network.Stream) {
 		defer stream.Close()
 
 		remote := stream.Conn().RemotePeer()
@@ -46,7 +45,7 @@ func HandleModelProtocol(host host.Host, modelRoot string) {
 		}
 
 		modelID := parts[1]
-		path := filepath.Join(modelRoot, modelID)
+		path := filepath.Join(common.LocalModelDir, modelID)
 		file, err := os.Open(path)
 		if err != nil {
 			io.WriteString(stream, fmt.Sprintf("ERR open: %v\n", err))
@@ -67,11 +66,11 @@ func HandleModelProtocol(host host.Host, modelRoot string) {
 	})
 }
 
-func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, modelRoot string) {
+func GetRemoteModel(sub *pubsub.Subscription) {
 	for {
-			msg, err := sub.Next(ctx)
+			msg, err := sub.Next(common.Ctx)
 			if err != nil {
-				if ctx.Err() != nil {
+				if common.Ctx.Err() != nil {
 					return
 				}
 				log.Printf("error reading pubsub message: %v\n", err)
@@ -79,7 +78,7 @@ func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 			}
 
 			// ignore self published messages
-			if msg.ReceivedFrom == h.ID() {
+			if msg.ReceivedFrom == common.Host.ID() {
 				continue
 			}
 
@@ -98,15 +97,15 @@ func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 					return
 				}
 				// ensure we have addresses for the peer. If not, try to dial (mDNS likely supplied addr)
-				ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
+				ctx2, cancel := context.WithTimeout(common.Ctx, 10*time.Second)
 				defer cancel()
 
-				if err := h.Connect(ctx2, peer.AddrInfo{ID: peerID}); err != nil {
+				if err := common.Host.Connect(ctx2, peer.AddrInfo{ID: peerID}); err != nil {
 					log.Printf("connect failed to %s: %v\n", meta.PeerID, err)
 				}
 
 				// open stream
-				stream, err := h.NewStream(ctx2, peerID, modelProtocolID)
+				stream, err := common.Host.NewStream(ctx2, peerID, modelProtocolID)
 				if err != nil {
 					log.Printf("open stream failed: %v\n", err)
 					return
@@ -127,7 +126,7 @@ func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 				}
 
 				if strings.HasPrefix(line, "OK") {
-					outpath := filepath.Join(modelRoot, "remote_"+meta.ModelID)
+					outpath := filepath.Join(common.RemoteModelDir, meta.ModelID)
 					out, err := os.Create(outpath)
 					if err != nil {
 						log.Printf("create file err: %v\n", err)

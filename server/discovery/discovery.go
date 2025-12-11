@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -14,11 +15,18 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-func NewKDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*routing.RoutingDiscovery, error) {
+func NewKDHT(ctx context.Context, host host.Host, bootstrapPeerString string) (*routing.RoutingDiscovery, error) {
 	var options []dht.Option
+	var bootstrapPeer multiaddr.Multiaddr
+	var err error
 
-	if len(bootstrapPeers) == 0 {
+	if bootstrapPeerString == "" {
 		options = append(options, dht.Mode(dht.ModeServer))
+	} else {
+		bootstrapPeer, err = multiaddr.NewMultiaddr(bootstrapPeerString)
+		if err != nil {
+			return nil, fmt.Errorf("invalid bootstrap peer multiaddr: %w", err)
+		}
 	}
 
 	kdht, err := dht.New(ctx, host, options...)
@@ -30,8 +38,8 @@ func NewKDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mul
 		return nil, err
 	}
 	
-	for _, peerAddr := range bootstrapPeers {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+	if bootstrapPeer != nil {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(bootstrapPeer)
 		log.Printf("peer %s", peerinfo.String())
 
 		go func(peerinfo peer.AddrInfo) {
