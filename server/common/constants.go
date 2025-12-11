@@ -11,6 +11,8 @@ var PubsubTopicName = "fl-model-announcements"
 var Host host.Host
 var Topic *pubsub.Topic
 var Ctx context.Context
+var LocalModelDir string
+var RemoteModelDir string
 
 func SetHost(host host.Host) {
 	Host = host
@@ -22,4 +24,9 @@ func SetTopic(topic *pubsub.Topic) {
 
 func SetContext(ctx context.Context) {
 	Ctx = ctx
+}
+
+func SetModelDirs(localModelDir string, remoteModelDir string) {
+	LocalModelDir = "/app" + localModelDir
+	RemoteModelDir = "/app" + remoteModelDir
 }

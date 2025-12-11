@@ -14,7 +14,6 @@ import (
 
 	"github.com/bqnic/diplomski-projekt/common"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -22,8 +21,8 @@ import (
 
 var modelProtocolID protocol.ID = "/fl/model/1.0.0"
 
-func HandleModelProtocol(host host.Host, modelRoot string) {
-	host.SetStreamHandler(modelProtocolID, func(stream network.Stream) {
+func HandleModelProtocol() {
+	common.Host.SetStreamHandler(modelProtocolID, func(stream network.Stream) {
 		defer stream.Close()
 
 		remote := stream.Conn().RemotePeer()
@@ -46,7 +45,7 @@ func HandleModelProtocol(host host.Host, modelRoot string) {
 		}
 
 		modelID := parts[1]
-		path := filepath.Join(modelRoot, modelID)
+		path := filepath.Join(common.LocalModelDir, modelID)
 		file, err := os.Open(path)
 		if err != nil {
 			io.WriteString(stream, fmt.Sprintf("ERR open: %v\n", err))
@@ -127,7 +126,7 @@ func GetRemoteModel(sub *pubsub.Subscription) {
 				}
 
 				if strings.HasPrefix(line, "OK") {
-					outpath := filepath.Join("shared/", "remote_"+meta.ModelID)
+					outpath := filepath.Join(common.RemoteModelDir, meta.ModelID)
 					out, err := os.Create(outpath)
 					if err != nil {
 						log.Printf("create file err: %v\n", err)

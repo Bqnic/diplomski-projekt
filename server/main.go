@@ -31,6 +31,8 @@ func main() {
 	remoteModelDir := os.Getenv("FL_REMOTE")
 	bootstrapPeer := os.Getenv("BOOTSTRAP_PEER")
 
+	common.SetModelDirs(localModelDir, remoteModelDir)
+
 	// ensure model dirs exists
 	if err := os.MkdirAll(localModelDir, 0755); err != nil {
 		log.Fatalf("could not create local model dir: %v", err)
@@ -84,7 +86,7 @@ func main() {
 
     grpcServer := grpc.NewServer()
     pb.RegisterModelServiceServer(grpcServer, &localGrpc.GoModelServer{
-        SaveDir: "/app/shared/local-models",
+        SaveDir: "/app" + localModelDir,
     })
 
     log.Println("Go gRPC server listening on :50051")
@@ -94,7 +96,7 @@ func main() {
 	go discovery.Discover(ctx, host, dht, "diabetes")
 
 	// start protocol handler for model transfers
-	communication.HandleModelProtocol(host, localModelDir)
+	communication.HandleModelProtocol()
 
 	// subscribe to announcements
 	localPubSub.SubscribeAnnouncements()
