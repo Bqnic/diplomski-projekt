@@ -1,5 +1,5 @@
 1. radeci GRPC server za python --- DONE
 2. radeca komunikacija izmedu GRPC klijenta i servera --- DONE
-3. radeci announcement kad se dobije model
-4. radeci prijenos modela na drugi node
+3. radeci announcement kad se dobije model --- DONE
+4. radeci prijenos modela na drugi
 5. radece slanje remote modela pythonu

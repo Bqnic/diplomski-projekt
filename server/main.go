@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -24,14 +23,13 @@ import (
 
 func main() {
 	ctx := context.Background()
-	var discoveryPeers common.AddrList
+
+	common.SetContext(ctx)
 
 	listen := os.Getenv("FL_LISTEN")
 	localModelDir := os.Getenv("FL_LOCAL")
 	remoteModelDir := os.Getenv("FL_REMOTE")
-
-	flag.Var(&discoveryPeers, "peer", "Peer multiaddress for peer discovery")
-	flag.Parse()
+	bootstrapPeer := os.Getenv("BOOTSTRAP_PEER")
 
 	// ensure model dirs exists
 	if err := os.MkdirAll(localModelDir, 0755); err != nil {
@@ -56,6 +54,8 @@ func main() {
 	}
 	defer host.Close()
 
+	common.SetHost(host)
+
 	common.PrintAddrs(host)
 
 	// setup pubsub
@@ -69,8 +69,9 @@ func main() {
 		log.Fatalf("failed to join pubsub topic: %v", err)
 	}
 
+	common.SetTopic(topic)
 
-	dht, err := discovery.NewKDHT(ctx, host, discoveryPeers)
+	dht, err := discovery.NewKDHT(ctx, host, bootstrapPeer)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -87,7 +88,7 @@ func main() {
     })
 
     log.Println("Go gRPC server listening on :50051")
-    grpcServer.Serve(lis)
+    go grpcServer.Serve(lis)
 	// --grpc--
 
 	go discovery.Discover(ctx, host, dht, "diabetes")
@@ -96,10 +97,7 @@ func main() {
 	communication.HandleModelProtocol(host, localModelDir)
 
 	// subscribe to announcements
-	localPubSub.SubscribeAnnouncements(ctx, topic, host, remoteModelDir)
-
-	// start announcer to periodically publish local model metadata
-	go localPubSub.AnnounceModel(ctx, topic, host, localModelDir)
+	localPubSub.SubscribeAnnouncements()
 
 	// wait for a SIGINT or SIGTERM signal
 	ch := make(chan os.Signal, 1)

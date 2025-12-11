@@ -8,23 +8,23 @@ Bootstrap čvor je onaj čvor preko kojeg će svi ostali čvorovi otkriti mrežu
 
 ```bash
 docker run --rm -it \
- -p 9001:9001 \
- server-node \
- -listen "/ip4/0.0.0.0/tcp/9001" \
- -local /shared/local-models \
- -remote /shared/remote-models
+  -p 9001:9001 \
+  -e FL_LISTEN="/ip4/0.0.0.0/tcp/9001" \
+  -e FL_LOCAL="/shared/local-models" \
+  -e FL_REMOTE="/shared/remote-models" \
+  server-node
 ```
 
 Svi ostali čvorovi se pokreću s peer dijelom, a postavlja se adresa bootstrap čvora (prvog pokrenutog)
 
 ```bash
 docker run --rm -it \
- -p 9002:9002 \
- server-node \
- -listen "/ip4/0.0.0.0/tcp/9002" \
- -local /shared/local-models \
- -remote /shared/remote-models \
- -peer /ip4/172.17.0.2/tcp/9001/p2p/12D3KooWQep4BBcvaYwzHLyVTBofUwHrSsJuQatwfx6BLiaezSqd
+  -p 9002:9002 \
+  -e FL_LISTEN="/ip4/0.0.0.0/tcp/9002" \
+  -e FL_LOCAL="/shared/local-models" \
+  -e FL_REMOTE="/shared/remote-models" \
+  -e BOOTSTRAP_PEER="/ip4/172.17.0.2/tcp/9001/p2p/12D3KooWLPx8f7mRtUCfMeJ7jHTCNFjpPspjfGuHkKsoUxN8oeG4" \
+  server-node
 ```
 
 Pri pokretanju pripaziti da se port promijeni, mora bit unikatan za svaki čvor.

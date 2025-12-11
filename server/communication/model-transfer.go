@@ -67,11 +67,11 @@ func HandleModelProtocol(host host.Host, modelRoot string) {
 	})
 }
 
-func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, modelRoot string) {
+func GetRemoteModel(sub *pubsub.Subscription) {
 	for {
-			msg, err := sub.Next(ctx)
+			msg, err := sub.Next(common.Ctx)
 			if err != nil {
-				if ctx.Err() != nil {
+				if common.Ctx.Err() != nil {
 					return
 				}
 				log.Printf("error reading pubsub message: %v\n", err)
@@ -79,7 +79,7 @@ func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 			}
 
 			// ignore self published messages
-			if msg.ReceivedFrom == h.ID() {
+			if msg.ReceivedFrom == common.Host.ID() {
 				continue
 			}
 
@@ -98,15 +98,15 @@ func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 					return
 				}
 				// ensure we have addresses for the peer. If not, try to dial (mDNS likely supplied addr)
-				ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
+				ctx2, cancel := context.WithTimeout(common.Ctx, 10*time.Second)
 				defer cancel()
 
-				if err := h.Connect(ctx2, peer.AddrInfo{ID: peerID}); err != nil {
+				if err := common.Host.Connect(ctx2, peer.AddrInfo{ID: peerID}); err != nil {
 					log.Printf("connect failed to %s: %v\n", meta.PeerID, err)
 				}
 
 				// open stream
-				stream, err := h.NewStream(ctx2, peerID, modelProtocolID)
+				stream, err := common.Host.NewStream(ctx2, peerID, modelProtocolID)
 				if err != nil {
 					log.Printf("open stream failed: %v\n", err)
 					return
@@ -127,7 +127,7 @@ func GetRemoteModel(ctx context.Context, h host.Host, sub *pubsub.Subscription, 
 				}
 
 				if strings.HasPrefix(line, "OK") {
-					outpath := filepath.Join(modelRoot, "remote_"+meta.ModelID)
+					outpath := filepath.Join("shared/", "remote_"+meta.ModelID)
 					out, err := os.Create(outpath)
 					if err != nil {
 						log.Printf("create file err: %v\n", err)

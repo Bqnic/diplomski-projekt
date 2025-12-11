@@ -20,9 +20,12 @@ def send_to_go(path, model_id):
     print("Python client: Go replied:", resp.message)
 
 def test():
+    print("Sending message.")
+    send_to_go("shared/yes.txt", "1")
+
     while True:
-        print("Sending message.")
-        send_to_go("shared/yes.txt", "1")
+        # just chillin
+        continue
 
 if __name__ == "__main__":
     test()
