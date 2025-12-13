@@ -1,7 +1,0 @@
-1. iskljucit discovery zasad i napravit staticku listu od 5 čvorova --- zapravo poboljsa sam discovery lol DONE
-2. skripta da ubrzam paljenje N čvorova
-3. napravit cleanup koda u projektu, izbrisat bezsmislene stvari, modulazirat gdje mogu
----------------
-4. napravit detaljnu dokumentaciju projekta, kako radit u projektu, o dockerfile-u, modelu, serveru itd.
-5. napravit discord server i kanale za specificne dijelove projekta te guidove / dokumentacija koja treba bit procitana
-6. napravit trello taskove za svaki path
