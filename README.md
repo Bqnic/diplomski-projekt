@@ -32,7 +32,13 @@ Docker image:
 Pokretanje čvorova:
 
 ```bash
-./start.sh {broj čvorova}
+./scripts/start.sh {broj čvorova}
+```
+
+Zaustavljanje čvorova:
+
+```bash
+./scripts/stop.sh {broj čvorova}
 ```
 
 Manualna docker komanda za pokretanje jednog čvora:
