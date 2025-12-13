@@ -1,3 +1,25 @@
+# Decentralizirano učenje modela preko P2P sustava
+
+Ovaj repozitorij prikazuje 1 čvor koji sadrži potrebne informacije da sudjeluje u P2P sustavu sastavljenom od njemu identičnih čvorova.
+Projekt je docker-niziran preko cache-anog docker image-a prikazanom u Dockerfile-u.
+
+Glavne stavke:
+
+1. Model
+   Lokalni model umjetne inteligencije čvora.
+2. Server
+   Server preko kojeg se komunikacija s drugim čvorovima obavlja i koji akumulira modele od drugih čvorova kako bi se ostvarilo decentralizirano učenje.
+
+## Tehnologije
+
+### Model
+
+Python, PyTorch, pandas, matplotlib, GRPC
+
+## Server
+
+Go, libp2p, GRPC
+
 # Kako pokrenit
 
 Docker image:
@@ -6,7 +28,13 @@ Docker image:
 Pokretanje čvorova:
 
 ```bash
-./start.sh {broj čvorova}
+./scripts/start.sh {broj čvorova}
+```
+
+Zaustavljanje čvorova:
+
+```bash
+./scripts/stop.sh {broj čvorova}
 ```
 
 Manualna docker komanda za pokretanje jednog čvora:
