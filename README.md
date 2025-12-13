@@ -10,8 +10,6 @@ Bootstrap čvor je onaj čvor preko kojeg će svi ostali čvorovi otkriti mrežu
 docker run --rm -it \
   -p 9001:9001 \
   -e FL_LISTEN="/ip4/0.0.0.0/tcp/9001" \
-  -e FL_LOCAL="/shared/local-models" \
-  -e FL_REMOTE="/shared/remote-models" \
   server-node
 ```
 
@@ -21,8 +19,6 @@ Svi ostali čvorovi se pokreću s peer dijelom, a postavlja se adresa bootstrap 
 docker run --rm -it \
   -p 9002:9002 \
   -e FL_LISTEN="/ip4/0.0.0.0/tcp/9002" \
-  -e FL_LOCAL="/shared/local-models" \
-  -e FL_REMOTE="/shared/remote-models" \
   -e BOOTSTRAP_PEER="/ip4/172.17.0.2/tcp/9001/p2p/12D3KooWLPx8f7mRtUCfMeJ7jHTCNFjpPspjfGuHkKsoUxN8oeG4" \
   server-node
 ```

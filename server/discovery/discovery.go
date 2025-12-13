@@ -1,18 +1,17 @@
 package discovery
 
 import (
-	"context"
 	"fmt"
 	"log"
 
+	"github.com/bqnic/diplomski-projekt/common"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/host"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/multiformats/go-multiaddr"
 )
 
-func NewKDHT(ctx context.Context, host host.Host, bootstrapPeerString string) (*routing.RoutingDiscovery, error) {
+func NewKDHT(bootstrapPeerString string) (*routing.RoutingDiscovery, error) {
 	var bootstrapPeer multiaddr.Multiaddr
 	var err error
 
@@ -23,12 +22,12 @@ func NewKDHT(ctx context.Context, host host.Host, bootstrapPeerString string) (*
 		}
 	}
 
-	kdht, err := dht.New(ctx, host, dht.Mode(dht.ModeServer))
+	kdht, err := dht.New(common.Ctx, common.Host, dht.Mode(dht.ModeServer))
 	if err != nil {
 		return nil, err
 	}
 
-	if err = kdht.Bootstrap(ctx); err != nil {
+	if err = kdht.Bootstrap(common.Ctx); err != nil {
 		return nil, err
 	}
 	
@@ -37,7 +36,7 @@ func NewKDHT(ctx context.Context, host host.Host, bootstrapPeerString string) (*
 		log.Printf("peer %s", peerinfo.String())
 
 		go func(peerinfo peer.AddrInfo) {
-			if err := host.Connect(ctx, peerinfo); err != nil {
+			if err := common.Host.Connect(common.Ctx, peerinfo); err != nil {
 				log.Printf("Error connecting to %v: %v", peerinfo, err)
 			} else {
 				log.Printf("Connected to bootstrap node: %v", peerinfo)

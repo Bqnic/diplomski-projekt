@@ -8,11 +8,12 @@ import (
 )
 
 var PubsubTopicName = "fl-model-announcements"
+var LocalModelDir string = "/app/shared/local-models"
+var RemoteModelDir string = "/app/shared/remote-models"
+var Ctx context.Context = context.Background()
+
 var Host host.Host
 var Topic *pubsub.Topic
-var Ctx context.Context
-var LocalModelDir string
-var RemoteModelDir string
 
 func SetHost(host host.Host) {
 	Host = host
@@ -20,13 +21,4 @@ func SetHost(host host.Host) {
 
 func SetTopic(topic *pubsub.Topic) {
 	Topic = topic
-}
-
-func SetContext(ctx context.Context) {
-	Ctx = ctx
-}
-
-func SetModelDirs(localModelDir string, remoteModelDir string) {
-	LocalModelDir = "/app" + localModelDir
-	RemoteModelDir = "/app" + remoteModelDir
 }
