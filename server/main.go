@@ -73,7 +73,7 @@ func main() {
 
 	common.SetTopic(topic)
 
-	dht, err := discovery.NewKDHT(ctx, host, bootstrapPeer)
+	_, err = discovery.NewKDHT(ctx, host, bootstrapPeer)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,8 +92,6 @@ func main() {
     log.Println("Go gRPC server listening on :50051")
     go grpcServer.Serve(lis)
 	// --grpc--
-
-	go discovery.Discover(ctx, host, dht, "diabetes")
 
 	// start protocol handler for model transfers
 	communication.HandleModelProtocol()
