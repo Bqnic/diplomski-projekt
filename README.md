@@ -38,7 +38,7 @@ Pokretanje čvorova:
 Zaustavljanje čvorova:
 
 ```bash
-./scripts/stop.sh {broj čvorova}
+./scripts/stop.sh {broj čvorova
 ```
 
 Manualna docker komanda za pokretanje jednog čvora:
