@@ -2,21 +2,20 @@ package pubsub
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/bqnic/diplomski-projekt/common"
 )
 
 func AnnounceModel(model common.ModelMeta) error {
-	log.Printf("PUBSUB: got model ", model)
+	common.Log.Debugw("Publishing model announcement", "model", model.ModelID, "size", model.Size)
 
 	b, _ := json.Marshal(model)
 	if err := common.Topic.Publish(common.Ctx, b); err != nil {
-		log.Printf("failed to publish model meta: %v", err)
+		common.Log.Errorw("Failed to publish model announcement", "model", model.ModelID, "err", err)
 		return err
 	}
 
-	log.Printf("[pubsub] announced model %s (%d bytes)", model.Size)
+	common.Log.Infow("Announced model to peers", "model", model.ModelID, "size", model.Size)
 
 	return nil
 }

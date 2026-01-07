@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -24,24 +22,24 @@ func main() {
 
 	// ensure model dirs exists
 	if err := os.MkdirAll(common.LocalModelDir, 0755); err != nil {
-		log.Fatalf("could not create local model dir: %v", err)
+		common.Log.Fatalw("Could not create local model directory", "dir", common.LocalModelDir, "err", err)
 	}
 
 	if err := os.MkdirAll(common.RemoteModelDir, 0755); err != nil {
-		log.Fatalf("could not create remote model dir: %v", err)
+		common.Log.Fatalw("Could not create remote model directory", "dir", common.RemoteModelDir, "err", err)
 	}
 
 	// create libp2p host
 	addr, err := multiaddr.NewMultiaddr(listen)
 	if err != nil {
-		log.Fatalf("invalid listen multiaddr: %v", err)
+		common.Log.Fatalw("Invalid listen multiaddr", "addr", listen, "err", err)
 	}
 
 	host, err := libp2p.New(
 		libp2p.ListenAddrs(addr),
 	)
 	if err != nil {
-		log.Fatalf("failed to create libp2p host: %v", err)
+		common.Log.Fatalw("Failed to create libp2p host", "err", err)
 	}
 	defer host.Close()
 
@@ -52,12 +50,12 @@ func main() {
 	// pubsub
 	ps, err := pubsub.NewGossipSub(common.Ctx, host)
 	if err != nil {
-		log.Fatalf("pubsub init failed: %v", err)
+		common.Log.Fatalw("Pubsub initialization failed", "err", err)
 	}
 
 	topic, err := ps.Join(common.PubsubTopicName)
 	if err != nil {
-		log.Fatalf("failed to join pubsub topic: %v", err)
+		common.Log.Fatalw("Failed to join pubsub topic", "topic", common.PubsubTopicName, "err", err)
 	}
 
 	common.SetTopic(topic)
@@ -65,14 +63,14 @@ func main() {
 	// discovery
 	_, err = discovery.NewKDHT(bootstrapPeer)
 	if err != nil {
-		log.Fatal(err)
+		common.Log.Fatalw("Discovery setup failed", "err", err)
 	}
 
 	// grpc
 	lis, err := net.Listen("tcp", ":50051")
-    if err != nil {
-        panic(err)
-    }
+	if err != nil {
+		panic(err)
+	}
 	
 	grpcServer := localGrpc.SetupGrpcServer()
     go grpcServer.Serve(lis)
@@ -87,6 +85,9 @@ func main() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch
-	fmt.Println("Received signal, shutting down...")
+	common.Log.Infow("Shutting down: signal received", "reason", "signal_received")
+	if err := common.SyncLogger(); err != nil {
+		// best-effort
+	}
 }
 
