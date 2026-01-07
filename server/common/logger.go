@@ -20,7 +20,7 @@ func InitLogger() {
     cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
     cfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
     
-    cfg.DisableCaller = true
+    cfg.DisableCaller = true // Disable caller info for cleaner logs, for debbugging, change to false to see origin of log messages
 
     logger, err := cfg.Build()
     if err != nil {
