@@ -1,8 +1,6 @@
 package pubsub
 
 import (
-	"log"
-
 	"github.com/bqnic/diplomski-projekt/common"
 	"github.com/bqnic/diplomski-projekt/communication"
 )
@@ -10,10 +8,10 @@ import (
 func SubscribeAnnouncements() {
 	sub, err := common.Topic.Subscribe()
 	if err != nil {
-		log.Fatalf("subscribe: failed to subscribe: %v", err)
+		common.Log.Fatalw("Failed to subscribe to announcements", "err", err)
 	}
 
-	log.Printf("subscribed")
+	common.Log.Infow("Subscribed to announcements", "topic", common.PubsubTopicName)
 
 	go communication.GetRemoteModel(sub)
 }

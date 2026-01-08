@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/bqnic/diplomski-projekt/common"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -33,14 +32,14 @@ func NewKDHT(bootstrapPeerString string) (*routing.RoutingDiscovery, error) {
 	
 	if bootstrapPeer != nil {
 		peerinfo, _ := peer.AddrInfoFromP2pAddr(bootstrapPeer)
-		log.Printf("peer %s", peerinfo.String())
+		common.Log.Infow("Bootstrap peer provided", "peer_short", common.ShortID(peerinfo.ID.String()), "addrs", peerinfo.Addrs)
 
 		go func(peerinfo peer.AddrInfo) {
-			if err := common.Host.Connect(common.Ctx, peerinfo); err != nil {
-				log.Printf("Error connecting to %v: %v", peerinfo, err)
-			} else {
-				log.Printf("Connected to bootstrap node: %v", peerinfo)
-			}
+				if err := common.Host.Connect(common.Ctx, peerinfo); err != nil {
+					common.Log.Errorw("Failed to connect to bootstrap peer", "peer_short", common.ShortID(peerinfo.ID.String()), "err", err)
+				} else {
+					common.Log.Infow("Connected to bootstrap peer", "peer_short", common.ShortID(peerinfo.ID.String()))
+				}
 		}(*peerinfo)
 	}
 
