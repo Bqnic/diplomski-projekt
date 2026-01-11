@@ -4,11 +4,9 @@ import argparse
 import io
 import os
 import json
-import hashlib
 import logging
 from pathlib import Path
 from typing import Dict, Tuple, List
-import zipfile
 
 import numpy as np
 import pandas as pd
@@ -116,88 +114,32 @@ def weight_stats(state_dict: Dict[str, torch.Tensor]) -> Dict[str, Dict[str, flo
         }
     return stats
 
-def export_state_dict_binary(
-    state_dict: Dict[str, torch.Tensor],
-    model_id: str,
+def export_model_buffer(
+    model: torch.nn.Module,
     epoch: int,
-    num_samples: int
-) -> bytes:
+    num_samples: int,
+    model_id: str
+) -> Tuple[io.BytesIO, str]:
     """
-    Export a PyTorch state_dict to an in-memory zip containing
-    .weights.bin and .meta.json. Returns the zip as bytes.
-
-    Args:
-        state_dict: model.state_dict()
-        model_id: unique model identifier
-        epoch: current epoch number
-        num_samples: number of samples used in training
+    Serialize the model into a single buffer (like .pt), ready to be sent over gRPC.
 
     Returns:
-        zip_bytes: bytes of zipped weights and meta
+        buffer: BytesIO containing the serialized model
+        model_id: unique identifier for this epoch/model
     """
-    tensors_meta = []
-    offset = 0
-    all_bytes = bytearray()
-
-    # Flatten all tensors into a single bytes array and record metadata
-    for name, tensor in state_dict.items():
-        t = tensor.detach().cpu().float().numpy()
-        raw = t.tobytes()
-
-        tensors_meta.append({
-            "name": name,
-            "dtype": "float32",
-            "shape": list(t.shape),
-            "offset": offset,
-            "size": len(raw)
-        })
-
-        all_bytes.extend(raw)
-        offset += len(raw)
-
-    # Architecture hash (optional, ensures consistent model)
-    arch_hash = hashlib.sha256(
-        json.dumps([(m["name"], m["shape"]) for m in tensors_meta]).encode()
-    ).hexdigest()
-
-    meta = {
+    buffer = io.BytesIO()
+    
+    ckpt = {
         "model_id": model_id,
-        "arch_hash": arch_hash,
         "epoch": epoch,
         "num_samples": num_samples,
-        "tensors": tensors_meta
+        "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
     }
 
-    # Create in-memory zip
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{model_id}.weights.bin", all_bytes)
-        zf.writestr(f"{model_id}.meta.json", json.dumps(meta, indent=2))
+    torch.save(ckpt, buffer)
     buffer.seek(0)
-
-    return buffer.read()
-
-def save_state_dict(
-    model: nn.Module,
-    out_dir: Path,
-    epoch: int,
-    save_json: bool,
-    logger: logging.Logger,
-) -> Tuple[Path, Path | None]:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    pt_path = out_dir / f"mlp_epoch_{epoch:03d}.pt"
-    torch.save(model.state_dict(), pt_path)
-    json_path: Path | None = None
-
-    if save_json:
-        state = {k: v.detach().cpu().tolist() for k, v in model.state_dict().items()}
-        json_path = out_dir / f"mlp_epoch_{epoch:03d}.json"
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(state, f)
-
-    logger.info(f"Saved checkpoint: {pt_path}" + (f" and {json_path}" if json_path else ""))
-    return pt_path, json_path
-
+    
+    return buffer, model_id
 
 def main() -> int:
     NODE_NAME = os.environ.get("NODE_NAME")
@@ -330,21 +272,10 @@ def main() -> int:
         lr_now = float(optimizer.param_groups[0]["lr"])
         logger.info(f"Epoch {epoch:03d}/{args.epochs} | train_loss={tr_loss:.6f} val_loss={val_loss:.6f} lr={lr_now:.2e}")
 
-        # Save weights each epoch
-        save_state_dict(model, ckpt_dir, epoch, args.save_json, logger)
-
         # Send to server
-        zip_bytes = export_state_dict_binary(
-            state_dict=model.state_dict(),
-            model_id=f"{NODE_NAME}_epoch_{epoch:03d}",
-            epoch=epoch,
-            num_samples=len(train_ds)
-        )
-
-        send_model_to_peer(
-            model_id=f"{NODE_NAME}_epoch_{epoch:03d}",
-            content_bytes=zip_bytes
-        )
+        buffer, mid = export_model_buffer(model, epoch, len(train_ds), model_id=f"{NODE_NAME}_epoch_{epoch:03d}")
+        msg = send_model_to_peer(buffer, mid)
+        logger.info(f"Sent model to peer: {msg}")
 
         # Optionally log/save weight stats
         if args.log_weight_stats or args.save_weight_stats_json:
