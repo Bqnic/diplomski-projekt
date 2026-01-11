@@ -4,7 +4,6 @@ import argparse
 import json
 import hashlib
 import logging
-import os
 from pathlib import Path
 from typing import Dict, Tuple, List
 
@@ -20,14 +19,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 
 from sklearn.utils.class_weight import compute_class_weight
-
-try:
-    from ucimlrepo import fetch_ucirepo
-except Exception as e:  # pragma: no cover
-    raise RuntimeError(
-        "Missing dependency 'ucimlrepo'. Install with: pip install ucimlrepo"
-    ) from e
-
 
 # -------------------------
 # Logging
@@ -130,6 +121,10 @@ def export_state_dict_binary(
     epoch,
     num_samples
 ):
+    
+    out_prefix = Path(out_prefix)
+    out_prefix.parent.mkdir(parents=True, exist_ok=True)
+
     tensors_meta = []
     offset = 0
     all_bytes = bytearray()
@@ -149,8 +144,8 @@ def export_state_dict_binary(
         all_bytes.extend(raw)
         offset += len(raw)
 
-    weights_path = f"{out_prefix}.weights.bin"
-    meta_path = f"{out_prefix}.meta.json"
+    weights_path = str(out_prefix) + ".weights.bin"
+    meta_path = str(out_prefix) + ".meta.json"
 
     with open(weights_path, "wb") as f:
         f.write(all_bytes)
@@ -232,10 +227,13 @@ def main() -> int:
     logger.info(f"Using device: {device}")
 
     # Fetch dataset
-    logger.info("Fetching dataset (UCI id=891) via ucimlrepo...")
-    ds = fetch_ucirepo(id=891)
-    X: pd.DataFrame = ds.data.features.copy()
-    y: pd.DataFrame = ds.data.targets.copy()
+    logger.info("Loading dataset (UCI id=891) from local CSV...")
+
+    data_path = "data/diabetes_binary_health_indicators_BRFSS2015.csv"
+    df = pd.read_csv(data_path)
+
+    X: pd.DataFrame = df.drop(columns=["Diabetes_binary"]).copy()
+    y: pd.DataFrame = df[["Diabetes_binary"]].copy()
 
     # Prep data (from notebook)
     continuous_cols = ["BMI", "Age", "Income"]
@@ -327,7 +325,7 @@ def main() -> int:
 
         export_state_dict_binary(
             model.state_dict(),
-            out_prefix=f"runs/exports/mlp_epoch_{epoch:03d}",
+            out_prefix=f"/runs/exports/mlp_epoch_{epoch:03d}",
             model_id="diabetes_mlp_v1",
             epoch=epoch,
             num_samples=len(train_ds)

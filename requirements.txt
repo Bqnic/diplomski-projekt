@@ -1,3 +1,6 @@
 grpcio
 grpcio-tools
 torch
+numpy
+pandas
+scikit-learn
