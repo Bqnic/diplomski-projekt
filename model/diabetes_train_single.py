@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import io
+import os
 import json
-import hashlib
 import logging
 from pathlib import Path
 from typing import Dict, Tuple, List
@@ -19,6 +20,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 
 from sklearn.utils.class_weight import compute_class_weight
+
+from model.grpc.grpc_client import send_model_to_peer
 
 # -------------------------
 # Logging
@@ -111,87 +114,36 @@ def weight_stats(state_dict: Dict[str, torch.Tensor]) -> Dict[str, Dict[str, flo
         }
     return stats
 
-# -------------------------
-# State saving each epoch
-# -------------------------
-def export_state_dict_binary(
-    state_dict,
-    out_prefix,
-    model_id,
-    epoch,
-    num_samples
-):
+def export_model_buffer(
+    model: torch.nn.Module,
+    epoch: int,
+    num_samples: int,
+    model_id: str
+) -> Tuple[io.BytesIO, str]:
+    """
+    Serialize the model into a single buffer (like .pt), ready to be sent over gRPC.
+
+    Returns:
+        buffer: BytesIO containing the serialized model
+        model_id: unique identifier for this epoch/model
+    """
+    buffer = io.BytesIO()
     
-    out_prefix = Path(out_prefix)
-    out_prefix.parent.mkdir(parents=True, exist_ok=True)
-
-    tensors_meta = []
-    offset = 0
-    all_bytes = bytearray()
-
-    for name, tensor in state_dict.items():
-        t = tensor.detach().cpu().float().numpy()
-        raw = t.tobytes()
-
-        tensors_meta.append({
-            "name": name,
-            "dtype": "float32",
-            "shape": list(t.shape),
-            "offset": offset,
-            "size": len(raw)
-        })
-
-        all_bytes.extend(raw)
-        offset += len(raw)
-
-    weights_path = str(out_prefix) + ".weights.bin"
-    meta_path = str(out_prefix) + ".meta.json"
-
-    with open(weights_path, "wb") as f:
-        f.write(all_bytes)
-
-    arch_hash = hashlib.sha256(
-        json.dumps(
-            [(m["name"], m["shape"]) for m in tensors_meta]
-        ).encode()
-    ).hexdigest()
-
-    meta = {
+    ckpt = {
         "model_id": model_id,
-        "arch_hash": arch_hash,
         "epoch": epoch,
         "num_samples": num_samples,
-        "tensors": tensors_meta
+        "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
     }
 
-    with open(meta_path, "w") as f:
-        json.dump(meta, f, indent=2)
-
-    return weights_path, meta_path
-
-def save_state_dict(
-    model: nn.Module,
-    out_dir: Path,
-    epoch: int,
-    save_json: bool,
-    logger: logging.Logger,
-) -> Tuple[Path, Path | None]:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    pt_path = out_dir / f"mlp_epoch_{epoch:03d}.pt"
-    torch.save(model.state_dict(), pt_path)
-    json_path: Path | None = None
-
-    if save_json:
-        state = {k: v.detach().cpu().tolist() for k, v in model.state_dict().items()}
-        json_path = out_dir / f"mlp_epoch_{epoch:03d}.json"
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(state, f)
-
-    logger.info(f"Saved checkpoint: {pt_path}" + (f" and {json_path}" if json_path else ""))
-    return pt_path, json_path
-
+    torch.save(ckpt, buffer)
+    buffer.seek(0)
+    
+    return buffer, model_id
 
 def main() -> int:
+    NODE_NAME = os.environ.get("NODE_NAME")
+
     ap = argparse.ArgumentParser(description="Train a single diabetes MLP and log weights each epoch.")
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--batch-size", type=int, default=1024)
@@ -320,16 +272,10 @@ def main() -> int:
         lr_now = float(optimizer.param_groups[0]["lr"])
         logger.info(f"Epoch {epoch:03d}/{args.epochs} | train_loss={tr_loss:.6f} val_loss={val_loss:.6f} lr={lr_now:.2e}")
 
-        # Save weights each epoch
-        save_state_dict(model, ckpt_dir, epoch, args.save_json, logger)
-
-        export_state_dict_binary(
-            model.state_dict(),
-            out_prefix=f"/runs/exports/mlp_epoch_{epoch:03d}",
-            model_id="diabetes_mlp_v1",
-            epoch=epoch,
-            num_samples=len(train_ds)
-        )
+        # Send to server
+        buffer, mid = export_model_buffer(model, epoch, len(train_ds), model_id=f"{NODE_NAME}_epoch_{epoch:03d}")
+        msg = send_model_to_peer(buffer, mid)
+        logger.info(f"Sent model to peer: {msg}")
 
         # Optionally log/save weight stats
         if args.log_weight_stats or args.save_weight_stats_json:

@@ -1,9 +1,14 @@
-Pokretanje skripte za treniranje modela:
+# Lokalno pokretanje skripte (za development)
 
+```bash
 python diabetes_train_single.py --epochs 20 --log-weight-stats
+```
 
-Ovo je više-manje sve što je potrebno, namjestite broj epoha i eventualno ako želite pratiti težine, ostali argumenti su tehničke stvari i neki hiperparametri koje ćemo izbrusiti s vremenom.
+# Rad modela unutar čvora
 
-Na početku nakon pokretanja povlači se dataset pa mu treba malo duže, to ćemo poslije spremiti da ne mora povlačiti s interneta.
-
-Svaku epohu sprema se state dict svih težina i cijelog modela u folder runs/diabetes_mlp/checkpoints, to se može promijeniti kako god je potrebno za server, i taj file nodeovi međusobno šalju. To se isto također sprema i u json formatu za lakše praćenje rada modela.
+1. Lokalno treniranje
+2. Svakih N epoha šalje svoj model (serijaliziran u .pt file) serveru preko grpc_client-a.
+   **TODO**
+3. Svakih N epoha agregira tuđe modele u svoj.
+   **TODO**
+4. Ispisuje u .json file sve potrebne informacije za vrijeme svog treniranja, uključujući agregiranje tuđih modela.

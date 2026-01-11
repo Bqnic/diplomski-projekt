@@ -23,6 +23,7 @@ echo "Starting bootstrap node on port $BASE_PORT"
 BOOTSTRAP_CONTAINER=$(docker run -d \
   --name "node-0" \
   -p "$BASE_PORT:$BASE_PORT" \
+  -e NODE_NAME="node-0" \
   -e FL_LISTEN="/ip4/0.0.0.0/tcp/$BASE_PORT" \
   "$IMAGE")
 
@@ -66,6 +67,7 @@ for ((i=1; i<=$NUM_NODES-1; i++)); do
   docker run -d \
     --name "node-$i" \
     -p "$PORT:$PORT" \
+    -e NODE_NAME="node-$i" \
     -e FL_LISTEN="/ip4/0.0.0.0/tcp/$PORT" \
     -e BOOTSTRAP_PEER="$BOOTSTRAP_MULTIADDR" \
     "$IMAGE"
