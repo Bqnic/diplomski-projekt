@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import hashlib
 import logging
 from pathlib import Path
 from typing import Dict, Tuple, List
+import zipfile
 
 import numpy as np
 import pandas as pd
@@ -19,6 +21,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 
 from sklearn.utils.class_weight import compute_class_weight
+
+from model.grpc.grpc_client import send_model_to_peer
 
 # -------------------------
 # Logging
@@ -111,24 +115,30 @@ def weight_stats(state_dict: Dict[str, torch.Tensor]) -> Dict[str, Dict[str, flo
         }
     return stats
 
-# -------------------------
-# State saving each epoch
-# -------------------------
 def export_state_dict_binary(
-    state_dict,
-    out_prefix,
-    model_id,
-    epoch,
-    num_samples
-):
-    
-    out_prefix = Path(out_prefix)
-    out_prefix.parent.mkdir(parents=True, exist_ok=True)
+    state_dict: Dict[str, torch.Tensor],
+    model_id: str,
+    epoch: int,
+    num_samples: int
+) -> bytes:
+    """
+    Export a PyTorch state_dict to an in-memory zip containing
+    .weights.bin and .meta.json. Returns the zip as bytes.
 
+    Args:
+        state_dict: model.state_dict()
+        model_id: unique model identifier
+        epoch: current epoch number
+        num_samples: number of samples used in training
+
+    Returns:
+        zip_bytes: bytes of zipped weights and meta
+    """
     tensors_meta = []
     offset = 0
     all_bytes = bytearray()
 
+    # Flatten all tensors into a single bytes array and record metadata
     for name, tensor in state_dict.items():
         t = tensor.detach().cpu().float().numpy()
         raw = t.tobytes()
@@ -144,16 +154,9 @@ def export_state_dict_binary(
         all_bytes.extend(raw)
         offset += len(raw)
 
-    weights_path = str(out_prefix) + ".weights.bin"
-    meta_path = str(out_prefix) + ".meta.json"
-
-    with open(weights_path, "wb") as f:
-        f.write(all_bytes)
-
+    # Architecture hash (optional, ensures consistent model)
     arch_hash = hashlib.sha256(
-        json.dumps(
-            [(m["name"], m["shape"]) for m in tensors_meta]
-        ).encode()
+        json.dumps([(m["name"], m["shape"]) for m in tensors_meta]).encode()
     ).hexdigest()
 
     meta = {
@@ -164,10 +167,14 @@ def export_state_dict_binary(
         "tensors": tensors_meta
     }
 
-    with open(meta_path, "w") as f:
-        json.dump(meta, f, indent=2)
+    # Create in-memory zip
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{model_id}.weights.bin", all_bytes)
+        zf.writestr(f"{model_id}.meta.json", json.dumps(meta, indent=2))
+    buffer.seek(0)
 
-    return weights_path, meta_path
+    return buffer.read()
 
 def save_state_dict(
     model: nn.Module,
@@ -323,12 +330,17 @@ def main() -> int:
         # Save weights each epoch
         save_state_dict(model, ckpt_dir, epoch, args.save_json, logger)
 
-        export_state_dict_binary(
-            model.state_dict(),
-            out_prefix=f"/runs/exports/mlp_epoch_{epoch:03d}",
-            model_id="diabetes_mlp_v1",
+        # Send to server
+        zip_bytes = export_state_dict_binary(
+            state_dict=model.state_dict(),
+            model_id=f"{args.run_name}_epoch_{epoch:03d}",
             epoch=epoch,
             num_samples=len(train_ds)
+        )
+
+        msg = send_model_to_peer(
+            model_id=f"{args.run_name}_epoch_{epoch:03d}",
+            content_bytes=zip_bytes
         )
 
         # Optionally log/save weight stats
