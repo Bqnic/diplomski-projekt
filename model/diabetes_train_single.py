@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
 import json
 import hashlib
 import logging
@@ -199,6 +200,8 @@ def save_state_dict(
 
 
 def main() -> int:
+    NODE_NAME = os.environ.get("NODE_NAME")
+
     ap = argparse.ArgumentParser(description="Train a single diabetes MLP and log weights each epoch.")
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--batch-size", type=int, default=1024)
@@ -333,13 +336,13 @@ def main() -> int:
         # Send to server
         zip_bytes = export_state_dict_binary(
             state_dict=model.state_dict(),
-            model_id=f"{args.run_name}_epoch_{epoch:03d}",
+            model_id=f"{NODE_NAME}_epoch_{epoch:03d}",
             epoch=epoch,
             num_samples=len(train_ds)
         )
 
-        msg = send_model_to_peer(
-            model_id=f"{args.run_name}_epoch_{epoch:03d}",
+        send_model_to_peer(
+            model_id=f"{NODE_NAME}_epoch_{epoch:03d}",
             content_bytes=zip_bytes
         )
 
