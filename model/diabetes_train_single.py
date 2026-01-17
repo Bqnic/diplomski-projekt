@@ -152,6 +152,7 @@ def split_data(X, y, NODE_NAME: str, NUM_NODES: int):
 def main() -> int:
     NODE_NAME = os.environ.get("NODE_NAME")
     NUM_NODES = int(os.environ.get("NUM_NODES"))
+    SENDING_EPOCH = int(os.environ.get("SENDING_EPOCH"))
 
     ap = argparse.ArgumentParser(description="Train a single diabetes MLP and log weights each epoch.")
     ap.add_argument("--epochs", type=int, default=10)
@@ -286,10 +287,103 @@ def main() -> int:
         lr_now = float(optimizer.param_groups[0]["lr"])
         logger.info(f"Epoch {epoch:03d}/{args.epochs} | train_loss={tr_loss:.6f} val_loss={val_loss:.6f} lr={lr_now:.2e}")
 
-        # Send to server
-        buffer, mid = export_model_buffer(model, epoch, len(train_ds), model_id=f"{NODE_NAME}_epoch_{epoch:03d}")
-        msg = send_model_to_peer(buffer, mid)
-        logger.info(f"Sent model to peer: {msg}")
+        if epoch % SENDING_EPOCH == 0:
+            # Send to server
+            buffer, mid = export_model_buffer(model, epoch, len(train_ds), model_id=f"{NODE_NAME}_epoch_{epoch:03d}")
+            msg = send_model_to_peer(buffer, mid)
+            logger.info(f"Sent model to peer: {msg}")
+
+            # -------------------------
+            # Aggregate remote + local models
+            # - include local model
+            # - epoch-weighted remote averaging
+            # - alpha = 0.30
+            # - load ALL files (torch.save produces zip-like blobs)
+            # -------------------------
+            AGG_ALPHA = 0.30
+
+            remote_dir = Path("/app/shared/remote-models")
+            aggregated_dir = Path("/app/shared/aggregated")
+            aggregated_dir.mkdir(parents=True, exist_ok=True)
+
+            if remote_dir.exists():
+                remote_files = [p for p in remote_dir.iterdir() if p.is_file()]
+
+                if remote_files:
+                    logger.info(f"Aggregating {len(remote_files)} remote model blobs")
+
+                    # ---- Local model
+                    local_state = {
+                        k: v.detach().cpu().float()
+                        for k, v in model.state_dict().items()
+                    }
+
+                    agg_remote = None
+                    total_remote_weight = 0.0
+                    successfully_loaded = []
+
+                    # ---- Remote models
+                    for f in remote_files:
+                        try:
+                            ckpt = torch.load(f, map_location="cpu")
+
+                            if "state_dict" not in ckpt:
+                                raise KeyError("Missing state_dict")
+
+                            state = ckpt["state_dict"]
+                            remote_epoch = float(ckpt.get("epoch", 1.0))
+
+                            if agg_remote is None:
+                                agg_remote = {
+                                    k: state[k].float() * remote_epoch
+                                    for k in state
+                                }
+                            else:
+                                for k in agg_remote:
+                                    agg_remote[k] += state[k].float() * remote_epoch
+
+                            total_remote_weight += remote_epoch
+                            successfully_loaded.append(f)
+
+                        except Exception as e:
+                            logger.error(f"Skipping invalid remote model {f.name}: {e}")
+
+                    if agg_remote is not None and total_remote_weight > 0:
+                        # Normalize remote aggregate
+                        for k in agg_remote:
+                            agg_remote[k] /= total_remote_weight
+
+                        # ---- Final blended update
+                        new_state = {}
+                        for k in local_state:
+                            new_state[k] = (
+                                (1.0 - AGG_ALPHA) * local_state[k]
+                                + AGG_ALPHA * agg_remote[k]
+                            )
+
+                        model.load_state_dict(
+                            {k: v.to(device) for k, v in new_state.items()},
+                            strict=True,
+                        )
+
+                        logger.info(
+                            f"Aggregation complete: "
+                            f"local={1.0 - AGG_ALPHA:.2f}, "
+                            f"remote={AGG_ALPHA:.2f}, "
+                            f"remote_models={len(successfully_loaded)}"
+                        )
+
+                        # Move processed files only
+                        for f in successfully_loaded:
+                            try:
+                                f.rename(aggregated_dir / f.name)
+                            except Exception as e:
+                                logger.error(f"Failed to move {f.name}: {e}")
+                else:
+                    logger.info("No remote model files found")
+            else:
+                logger.info("Remote model directory does not exist")
+
 
         # Optionally log/save weight stats
         if args.log_weight_stats or args.save_weight_stats_json:
