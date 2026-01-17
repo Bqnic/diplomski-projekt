@@ -152,6 +152,7 @@ def split_data(X, y, NODE_NAME: str, NUM_NODES: int):
 def main() -> int:
     NODE_NAME = os.environ.get("NODE_NAME")
     NUM_NODES = int(os.environ.get("NUM_NODES"))
+    SENDING_EPOCH = int(os.environ.get("SENDING_EPOCH"))
 
     ap = argparse.ArgumentParser(description="Train a single diabetes MLP and log weights each epoch.")
     ap.add_argument("--epochs", type=int, default=10)
@@ -287,9 +288,10 @@ def main() -> int:
         logger.info(f"Epoch {epoch:03d}/{args.epochs} | train_loss={tr_loss:.6f} val_loss={val_loss:.6f} lr={lr_now:.2e}")
 
         # Send to server
-        buffer, mid = export_model_buffer(model, epoch, len(train_ds), model_id=f"{NODE_NAME}_epoch_{epoch:03d}")
-        msg = send_model_to_peer(buffer, mid)
-        logger.info(f"Sent model to peer: {msg}")
+        if epoch % SENDING_EPOCH == 0:
+            buffer, mid = export_model_buffer(model, epoch, len(train_ds), model_id=f"{NODE_NAME}_epoch_{epoch:03d}")
+            msg = send_model_to_peer(buffer, mid)
+            logger.info(f"Sent model to peer: {msg}")
 
         # Optionally log/save weight stats
         if args.log_weight_stats or args.save_weight_stats_json:
