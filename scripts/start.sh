@@ -68,6 +68,7 @@ for ((i=1; i<=$NUM_NODES-1; i++)); do
     --name "node-$i" \
     -p "$PORT:$PORT" \
     -e NODE_NAME="node-$i" \
+    -e NUM_NODES="$NUM_NODES" \
     -e FL_LISTEN="/ip4/0.0.0.0/tcp/$PORT" \
     -e BOOTSTRAP_PEER="$BOOTSTRAP_MULTIADDR" \
     "$IMAGE"

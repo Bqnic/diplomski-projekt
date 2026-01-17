@@ -141,8 +141,17 @@ def export_model_buffer(
     
     return buffer, model_id
 
+def split_data(X, y, NODE_NAME: str, NUM_NODES: int):
+    id = int(NODE_NAME.split("-")[-1])
+
+    indices = np.arange(len(X))
+    split_indices = indices[id::NUM_NODES]
+
+    return X.iloc[split_indices], y.iloc[split_indices]
+
 def main() -> int:
     NODE_NAME = os.environ.get("NODE_NAME")
+    NUM_NODES = int(os.environ.get("NUM_NODES"))
 
     ap = argparse.ArgumentParser(description="Train a single diabetes MLP and log weights each epoch.")
     ap.add_argument("--epochs", type=int, default=10)
@@ -174,6 +183,8 @@ def main() -> int:
         from datetime import datetime
         args.run_name = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     logger = setup_logging(log_dir, args.run_name)
+    logger.info(f"Node name: {NODE_NAME}")
+    logger.info(f"Number of nodes: {NUM_NODES}")
 
     device = torch.device(args.device) if args.device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
@@ -184,8 +195,11 @@ def main() -> int:
     data_path = "data/diabetes_binary_health_indicators_BRFSS2015.csv"
     df = pd.read_csv(data_path)
 
-    X: pd.DataFrame = df.drop(columns=["Diabetes_binary"]).copy()
-    y: pd.DataFrame = df[["Diabetes_binary"]].copy()
+    X_temp: pd.DataFrame = df.drop(columns=["Diabetes_binary"]).copy()
+    y_temp: pd.DataFrame = df[["Diabetes_binary"]].copy()
+
+    X, y = split_data(X_temp.copy(), y_temp.copy(), NODE_NAME, NUM_NODES)
+    logger.info(f"Taking every example starting from {NODE_NAME}, step {NUM_NODES}")
 
     # Prep data (from notebook)
     continuous_cols = ["BMI", "Age", "Income"]
