@@ -367,6 +367,17 @@ def main() -> int:
                             strict=True,
                         )
 
+                        # Reset optimizer and scheduler
+                        optimizer = torch.optim.AdamW(
+                            model.parameters(),
+                            lr=args.lr,
+                            weight_decay=args.weight_decay,
+                        )
+
+                        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                            optimizer, mode="min", factor=0.5, patience=2
+                        )
+
                         logger.info(
                             f"Aggregation complete: "
                             f"local={1.0 - AGG_ALPHA:.2f}, "
