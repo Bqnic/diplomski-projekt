@@ -20,15 +20,6 @@ func main() {
 	listen := os.Getenv("FL_LISTEN")
 	bootstrapPeer := os.Getenv("BOOTSTRAP_PEER")
 
-	// ensure model dirs exists
-	if err := os.MkdirAll(common.LocalModelDir, 0755); err != nil {
-		common.Log.Fatalw("Could not create local model directory", "dir", common.LocalModelDir, "err", err)
-	}
-
-	if err := os.MkdirAll(common.RemoteModelDir, 0755); err != nil {
-		common.Log.Fatalw("Could not create remote model directory", "dir", common.RemoteModelDir, "err", err)
-	}
-
 	// create libp2p host
 	addr, err := multiaddr.NewMultiaddr(listen)
 	if err != nil {
