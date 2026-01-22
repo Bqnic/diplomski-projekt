@@ -153,6 +153,7 @@ def main() -> int:
     NODE_NAME = os.environ.get("NODE_NAME")
     NUM_NODES = int(os.environ.get("NUM_NODES"))
     SENDING_EPOCH = int(os.environ.get("SENDING_EPOCH"))
+    AGGREGATING_EPOCH = int(os.environ.get("AGGREGATING_EPOCH"))
 
     ap = argparse.ArgumentParser(description="Train a single diabetes MLP and log weights each epoch.")
     ap.add_argument("--epochs", type=int, default=10)
@@ -176,7 +177,6 @@ def main() -> int:
     torch.cuda.manual_seed_all(args.seed)
 
     out_dir = Path(args.out_dir)
-    ckpt_dir = out_dir / "checkpoints"
     log_dir = out_dir / "logs"
     stats_dir = out_dir / "weight_stats"
 
@@ -293,6 +293,7 @@ def main() -> int:
             msg = send_model_to_peer(buffer, mid)
             logger.info(f"Sent model to peer: {msg}")
 
+        if epoch % AGGREGATING_EPOCH == 0:
             # -------------------------
             # Aggregate remote + local models
             # - include local model

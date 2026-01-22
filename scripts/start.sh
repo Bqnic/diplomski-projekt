@@ -12,7 +12,8 @@ NUM_NODES="$1"
 
 IMAGE="server-node"
 BASE_PORT=9001
-SENDING_EPOCH=3
+SENDING_EPOCH=2
+AGGREGATING_EPOCH=3
 
 echo "Starting $NUM_NODES nodes"
 
@@ -26,6 +27,7 @@ BOOTSTRAP_CONTAINER=$(docker run -d \
   -p "$BASE_PORT:$BASE_PORT" \
   -e NUM_NODES="$NUM_NODES" \
   -e SENDING_EPOCH="$SENDING_EPOCH" \
+  -e AGGREGATING_EPOCH="$AGGREGATING_EPOCH" \
   -e NODE_NAME="node-0" \
   -e FL_LISTEN="/ip4/0.0.0.0/tcp/$BASE_PORT" \
   "$IMAGE")
@@ -73,6 +75,7 @@ for ((i=1; i<=$NUM_NODES-1; i++)); do
     -e NODE_NAME="node-$i" \
     -e NUM_NODES="$NUM_NODES" \
     -e SENDING_EPOCH="$SENDING_EPOCH" \
+    -e AGGREGATING_EPOCH="$AGGREGATING_EPOCH" \
     -e FL_LISTEN="/ip4/0.0.0.0/tcp/$PORT" \
     -e BOOTSTRAP_PEER="$BOOTSTRAP_MULTIADDR" \
     "$IMAGE"
