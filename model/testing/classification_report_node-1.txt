@@ -1,0 +1,14 @@
+node-1
+Accuracy: 0.722913
+ROC-AUC:  0.832418
+
+Classification report:
+
+              precision    recall  f1-score   support
+
+           0       0.96      0.71      0.82      6567
+           1       0.30      0.80      0.44      1044
+
+    accuracy                           0.72      7611
+   macro avg       0.63      0.75      0.63      7611
+weighted avg       0.87      0.72      0.76      7611

@@ -298,10 +298,10 @@ def main() -> int:
             # Aggregate remote + local models
             # - include local model
             # - epoch-weighted remote averaging
-            # - alpha = 0.30
+            # - alpha = 0.75
             # - load ALL files (torch.save produces zip-like blobs)
             # -------------------------
-            AGG_ALPHA = 0.40
+            AGG_ALPHA = 0.75
 
             remote_dir = Path("/app/shared/remote-models")
             aggregated_dir = Path("/app/shared/aggregated")

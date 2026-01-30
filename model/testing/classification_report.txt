@@ -1,0 +1,16 @@
+2026-01-19 19:14:42 | INFO | === Test Evaluation (imbalanced) ===
+2026-01-19 19:14:42 | INFO | Accuracy: 0.729659
+2026-01-19 19:14:42 | INFO | ROC-AUC:   0.830147
+2026-01-19 19:14:42 | INFO | Classification report:
+              precision    recall  f1-score   support
+
+           0       0.96      0.72      0.82     32750
+           1       0.31      0.79      0.45      5302
+
+    accuracy                           0.73     38052
+   macro avg       0.63      0.76      0.64     38052
+weighted avg       0.87      0.73      0.77     38052
+
+2026-01-19 19:14:42 | INFO | Confusion matrix:
+[[23570  9180]
+ [ 1107  4195]]

@@ -1,0 +1,13 @@
+node-0
+2026-01-26 17:42:11 | INFO | === Test Evaluation (imbalanced) ===
+2026-01-26 17:42:11 | INFO | Accuracy: 0.726118
+2026-01-26 17:42:11 | INFO | ROC-AUC:   0.834972
+2026-01-26 17:42:11 | INFO | Classification report:
+              precision    recall  f1-score   support
+
+           0       0.96      0.72      0.82      6567
+           1       0.31      0.80      0.45      1044
+
+    accuracy                           0.73      7611
+   macro avg       0.64      0.76      0.63      7611
+weighted avg       0.87      0.73      0.77      7611
